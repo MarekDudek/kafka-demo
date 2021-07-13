@@ -25,5 +25,6 @@ public class KafkaProducerApplication
         final Future<RecordMetadata> future = producer.send(record);
         final RecordMetadata metadata = future.get();
         System.out.println(metadata);
+        producer.close();
     }
 }
