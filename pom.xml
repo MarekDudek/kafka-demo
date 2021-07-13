@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>md</groupId>
-    <artifactId>first-kafka-producer</artifactId>
+    <artifactId>kafka-demo</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <properties>

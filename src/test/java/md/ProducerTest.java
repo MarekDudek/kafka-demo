@@ -7,7 +7,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
+import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -19,11 +19,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProducerTest
 {
     @Test
-    void test() throws ExecutionException, InterruptedException
+    void test() throws ExecutionException, InterruptedException, IOException
     {
-        final Optional<Properties> maybeProperties = loadFromFile("src/main/resources/first-producer.properties");
-        assertThat(maybeProperties).isPresent();
-        final Properties properties = maybeProperties.get();
+        final Properties properties = loadFromFile("src/main/resources/first-producer.properties");
         final String topic = properties.getProperty("output.topic.name");
         assertThat(topic).isNotEmpty();
         final ProducerRecord<String, String> record = new ProducerRecord<>(topic, "some-key", "some-value");
