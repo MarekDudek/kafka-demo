@@ -12,16 +12,16 @@ import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import static md.PropertiesHelper.loadFromFile;
+import static md.PropertiesHelper.fromFile;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Slf4j
 class ProducerTest
 {
     @Test
-    void test() throws ExecutionException, InterruptedException, IOException
+    void producing() throws ExecutionException, InterruptedException, IOException
     {
-        final Properties properties = loadFromFile("src/main/resources/first-producer.properties");
+        final Properties properties = fromFile("src/main/resources/first-producer.properties");
         final String topic = properties.getProperty("output.topic.name");
         assertThat(topic).isNotEmpty();
         final ProducerRecord<String, String> record = new ProducerRecord<>(topic, "some-key", "some-value");

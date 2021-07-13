@@ -8,7 +8,7 @@ public enum PropertiesHelper
 {
     ;
 
-    public static Properties loadFromFile(final String name) throws IOException
+    public static Properties fromFile(final String name) throws IOException
     {
         final Properties p = new Properties();
         final FileInputStream s = new FileInputStream(name);
