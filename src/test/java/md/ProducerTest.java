@@ -21,10 +21,8 @@ class ProducerTest
     @Test
     void producing() throws ExecutionException, InterruptedException, IOException
     {
-        final Properties properties = fromFile("src/main/resources/first-producer.properties");
-        final String topic = properties.getProperty("output.topic.name");
-        assertThat(topic).isNotEmpty();
-        final ProducerRecord<String, String> record = new ProducerRecord<>(topic, "some-key", "some-value");
+        final Properties properties = fromFile("src/main/resources/confluent-platform-6.2.0.properties");
+        final ProducerRecord<String, String> record = new ProducerRecord<>("some-topic", "some-key", "some-value");
         final Producer<String, String> producer = new KafkaProducer<>(properties);
         final Future<RecordMetadata> future = producer.send(record);
         final RecordMetadata metadata = future.get();
