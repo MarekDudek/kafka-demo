@@ -42,7 +42,7 @@ final class ProducingConsumingTest
         final Future<RecordMetadata> f = p.send(r);
         p.flush();
         final RecordMetadata md = f.get();
-        log.info("md: {}", md);
+        log.info("Got {}", md);
         assertThat(md.hasOffset()).isTrue();
         assertThat(md.hasTimestamp()).isTrue();
         p.close();
@@ -57,7 +57,7 @@ final class ProducingConsumingTest
         log.info("Polling ...");
         final ConsumerRecords<String, String> rs = c.poll(ofSeconds(3));
         rs.forEach(r -> {
-            log.info("{} = {} ({})",
+            log.info("Got {} = {} ({})",
                     r.key(),
                     r.value(),
                     r.headers()
