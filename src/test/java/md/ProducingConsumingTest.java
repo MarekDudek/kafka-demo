@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Slf4j
 final class ProducingConsumingTest
 {
-    private static final String PROPERTIES = "src/main/resources/confluent-platform-6.2.0.properties";
+    private static final String PROPERTIES = "src/main/resources/confluent-platform-6.2.0-multi-broker.properties";
     private static final String TOPIC = "some-topic";
 
     private static final Random RANDOM = new Random();
@@ -55,7 +55,7 @@ final class ProducingConsumingTest
         final Consumer<String, String> c = new KafkaConsumer<>(ps);
         c.subscribe(singletonList(TOPIC));
         log.info("Polling ...");
-        final ConsumerRecords<String, String> rs = c.poll(ofSeconds(3));
+        final ConsumerRecords<String, String> rs = c.poll(ofSeconds(10));
         rs.forEach(r -> {
             log.info("Got {} = {} ({})",
                     r.key(),
