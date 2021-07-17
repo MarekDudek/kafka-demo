@@ -56,6 +56,7 @@ final class ProducingConsumingTest
         c.subscribe(singletonList(TOPIC));
         log.info("Polling ...");
         final ConsumerRecords<String, String> rs = c.poll(ofSeconds(10));
+        assertThat(rs.isEmpty()).isFalse();
         rs.forEach(r -> {
             log.info("Got {} = {} ({})",
                     r.key(),
