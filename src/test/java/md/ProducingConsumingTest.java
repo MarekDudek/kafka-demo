@@ -1,106 +1,77 @@
 package md;
 
+import com.google.common.collect.ImmutableMap;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.Producer;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.RecordMetadata;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.junit.jupiter.api.Test;
 
-import java.util.Properties;
-import java.util.Random;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 import static java.time.Duration.ofSeconds;
 import static java.util.Collections.singletonList;
 import static java.util.Optional.empty;
-import static md.PropertiesHelper.fromFile;
+import static org.apache.kafka.clients.consumer.ConsumerConfig.*;
+import static org.apache.kafka.clients.producer.ProducerConfig.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Slf4j
-@TestMethodOrder(OrderAnnotation.class)
 final class ProducingConsumingTest
 {
-    private static final String PROPERTIES = "src/main/resources/confluent-platform-6.2.0-multi-broker.properties";
-    private static final String PRODUCER_PROPERTIES = "src/main/resources/confluent-platform-6.2.0-multi-broker-producer.properties";
-    private static final String CONSUMER_PROPERTIES = "src/main/resources/confluent-platform-6.2.0-multi-broker-consumer.properties";
-    private static final String TOPIC = "some-topic";
+    private static final String BOOTSTRAP_SERVERS = "localhost:19092,localhost:29092,localhost:39092";
+    private static final String TOPIC = "test-topic";
+    private static final String KEY = "key";
+    private static final String VALUE = "value";
 
-    private static final Random RANDOM = new Random();
-
-    private static TopicManager topicManager;
-
-    @BeforeAll
-    public static void setUp()
-    {
-        topicManager = new TopicManager(AdminClient.create(PropertiesHelper.fromFile(PROPERTIES)));
-    }
-
-    @AfterAll
-    public static void tearDown()
-    {
-        topicManager.close();
-    }
 
     @Test
-    @Order(1)
-    void createTopic() throws ExecutionException, InterruptedException
+    void single_record_is_produced_and_consumed() throws ExecutionException, InterruptedException
     {
-        topicManager.createTopic(new NewTopic(TOPIC, empty(), empty()));
-    }
+        final Map<String, Object> adminConfig = ImmutableMap.<String, Object>builder().
+                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                build();
+        final AdminClient admin = AdminClient.create(adminConfig);
 
-    @Test
-    @Order(2)
-    void produce() throws ExecutionException, InterruptedException
-    {
-        final Properties ps = fromFile(PROPERTIES, PRODUCER_PROPERTIES);
-        final Producer<String, String> p = new KafkaProducer<>(ps);
-        final ProducerRecord<String, String> r = new ProducerRecord<>(
-                TOPIC,
-                "key-" + RANDOM.nextInt(10),
-                "value-" + RANDOM.nextInt(1_000_000)
-        );
-        final Future<RecordMetadata> f = p.send(r);
-        p.flush();
-        final RecordMetadata md = f.get();
-        log.info("Got {}", md);
+        admin.createTopics(singletonList(new NewTopic(TOPIC, empty(), empty()))).all().get();
+
+        final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
+                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
+                put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
+                put(ACKS_CONFIG, "all").
+                build();
+        final Producer<String, String> producer = new KafkaProducer<>(producerConfig);
+
+        final ProducerRecord<String, String> producerRecord = new ProducerRecord<>(TOPIC, KEY, VALUE);
+        final RecordMetadata md = producer.send(producerRecord).get();
+        producer.flush();
         assertThat(md.hasOffset()).isTrue();
         assertThat(md.hasTimestamp()).isTrue();
-        p.close();
-    }
+        producer.close();
 
-    @Test
-    @Order(3)
-    void consume()
-    {
-        final Properties ps = fromFile(PROPERTIES, CONSUMER_PROPERTIES);
-        final Consumer<String, String> c = new KafkaConsumer<>(ps);
-        c.subscribe(singletonList(TOPIC));
-        log.info("Polling ...");
-        final ConsumerRecords<String, String> rs = c.poll(ofSeconds(30));
-        assertThat(rs.isEmpty()).isFalse();
-        rs.forEach(r -> {
-            log.info("Got {} = {} ({})",
-                    r.key(),
-                    r.value(),
-                    r.headers()
-            );
-        });
-        log.info("... polled.");
-        c.close();
-    }
+        final Map<String, Object> consumerConfig = ImmutableMap.<String, Object>builder().
+                put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName()).
+                put(VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName()).
+                put(GROUP_ID_CONFIG, "test-group").
+                put(AUTO_OFFSET_RESET_CONFIG, "earliest").
+                build();
+        final Consumer<String, String> consumer = new KafkaConsumer<>(consumerConfig);
 
-    @Test
-    @Order(4)
-    void deleteTopic() throws ExecutionException, InterruptedException
-    {
-        topicManager.deleteTopic(TOPIC);
+        consumer.subscribe(singletonList(TOPIC));
+        final ConsumerRecords<String, String> records = consumer.poll(ofSeconds(1));
+        assertThat(records.count()).isEqualTo(1);
+        final ConsumerRecord<String, String> consumerRecord = records.iterator().next();
+        assertThat(consumerRecord.key()).isEqualTo(KEY);
+        assertThat(consumerRecord.value()).isEqualTo(VALUE);
+        consumer.close();
+
+        admin.deleteTopics(singletonList(TOPIC)).all().get();
     }
 }
