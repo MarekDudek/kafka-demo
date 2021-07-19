@@ -2,8 +2,6 @@ package md;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.CreateTopicsResult;
-import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -12,11 +10,8 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.common.KafkaFuture;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 
 import java.util.Properties;
 import java.util.Random;
@@ -40,17 +35,25 @@ final class ProducingConsumingTest
 
     private static final Random RANDOM = new Random();
 
+    private static TopicManager topicManager;
+
+    @BeforeAll
+    public static void setUp()
+    {
+        topicManager = new TopicManager(AdminClient.create(PropertiesHelper.fromFile(PROPERTIES)));
+    }
+
+    @AfterAll
+    public static void tearDown()
+    {
+        topicManager.close();
+    }
+
     @Test
     @Order(1)
     void createTopic() throws ExecutionException, InterruptedException
     {
-        final Properties ps = fromFile(PROPERTIES);
-        AdminClient a = AdminClient.create(ps);
-        final NewTopic t = new NewTopic(TOPIC, empty(), empty());
-        final CreateTopicsResult ts = a.createTopics(singletonList(t));
-        final KafkaFuture<Void> f = ts.all();
-        f.get();
-        a.close();
+        topicManager.createTopic(new NewTopic(TOPIC, empty(), empty()));
     }
 
     @Test
@@ -98,11 +101,6 @@ final class ProducingConsumingTest
     @Order(4)
     void deleteTopic() throws ExecutionException, InterruptedException
     {
-        final Properties ps = fromFile(PROPERTIES);
-        AdminClient a = AdminClient.create(ps);
-        final DeleteTopicsResult ts = a.deleteTopics(singletonList(TOPIC));
-        final KafkaFuture<Void> f = ts.all();
-        f.get();
-        a.close();
+        topicManager.deleteTopic(TOPIC);
     }
 }
