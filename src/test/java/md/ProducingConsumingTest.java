@@ -25,10 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 final class ProducingConsumingTest
 {
     private static final String BOOTSTRAP_SERVERS = "localhost:19092,localhost:29092,localhost:39092";
-    private static final String TOPIC = "test-topic";
     private static final String KEY = "key";
     private static final String VALUE = "value";
-
 
     @Test
     void single_record_is_produced_and_consumed() throws ExecutionException, InterruptedException
@@ -38,7 +36,8 @@ final class ProducingConsumingTest
                 build();
         final AdminClient admin = AdminClient.create(adminConfig);
 
-        admin.createTopics(singletonList(new NewTopic(TOPIC, empty(), empty()))).all().get();
+        final String topic = "test-topic-one";
+        admin.createTopics(singletonList(new NewTopic(topic, empty(), empty()))).all().get();
 
         final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
                 put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
@@ -48,11 +47,13 @@ final class ProducingConsumingTest
                 build();
         final Producer<String, String> producer = new KafkaProducer<>(producerConfig);
 
-        final ProducerRecord<String, String> producerRecord = new ProducerRecord<>(TOPIC, KEY, VALUE);
+        final ProducerRecord<String, String> producerRecord = new ProducerRecord<>(topic, KEY, VALUE);
         final RecordMetadata md = producer.send(producerRecord).get();
         producer.flush();
         assertThat(md.hasOffset()).isTrue();
+        assertThat(md.offset()).isEqualTo(0);
         assertThat(md.hasTimestamp()).isTrue();
+
         producer.close();
 
         final Map<String, Object> consumerConfig = ImmutableMap.<String, Object>builder().
@@ -64,7 +65,7 @@ final class ProducingConsumingTest
                 build();
         final Consumer<String, String> consumer = new KafkaConsumer<>(consumerConfig);
 
-        consumer.subscribe(singletonList(TOPIC));
+        consumer.subscribe(singletonList(topic));
         final ConsumerRecords<String, String> records = consumer.poll(ofSeconds(1));
         assertThat(records.count()).isEqualTo(1);
         final ConsumerRecord<String, String> consumerRecord = records.iterator().next();
@@ -72,6 +73,77 @@ final class ProducingConsumingTest
         assertThat(consumerRecord.value()).isEqualTo(VALUE);
         consumer.close();
 
-        admin.deleteTopics(singletonList(TOPIC)).all().get();
+        admin.deleteTopics(singletonList(topic)).all().get();
+        admin.close();
+    }
+
+    @Test
+    void idempotent_producer() throws ExecutionException, InterruptedException
+    {
+        final Map<String, Object> adminConfig = ImmutableMap.<String, Object>builder().
+                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                build();
+        final AdminClient admin = AdminClient.create(adminConfig);
+
+        final String topic = "test-topic-two";
+        admin.createTopics(singletonList(new NewTopic(topic, empty(), empty()))).all().get();
+
+        final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
+                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
+                put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
+                put(ACKS_CONFIG, "all").
+                put(ENABLE_IDEMPOTENCE_CONFIG, true).
+                build();
+        final Producer<String, String> producer = new KafkaProducer<>(producerConfig);
+
+        final ProducerRecord<String, String> producerRecord = new ProducerRecord<>(topic, KEY, VALUE);
+        final RecordMetadata md = producer.send(producerRecord).get();
+        producer.flush();
+        assertThat(md.hasOffset()).isTrue();
+        assertThat(md.hasTimestamp()).isTrue();
+
+        producer.close();
+
+        admin.deleteTopics(singletonList(topic)).all().get();
+        admin.close();
+    }
+
+    @Test
+    void transactional_producer() throws ExecutionException, InterruptedException
+    {
+        final Map<String, Object> adminConfig = ImmutableMap.<String, Object>builder().
+                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                build();
+        final AdminClient admin = AdminClient.create(adminConfig);
+
+        final String topic = "test-topic-three";
+        admin.createTopics(singletonList(new NewTopic(topic, empty(), empty()))).all().get();
+
+        final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
+                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
+                put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
+                put(ACKS_CONFIG, "all").
+                put(TRANSACTIONAL_ID_CONFIG, "my-transactional-id").
+                build();
+        final Producer<String, String> producer = new KafkaProducer<>(producerConfig);
+
+        producer.initTransactions();
+        producer.beginTransaction();
+        for (int i = 0; i < 10; i++)
+        {
+            final ProducerRecord<String, String> producerRecord = new ProducerRecord<>(topic, KEY, VALUE);
+            final RecordMetadata md = producer.send(producerRecord).get();
+            assertThat(md.hasOffset()).isTrue();
+            assertThat(md.offset()).isEqualTo(i);
+            assertThat(md.hasTimestamp()).isTrue();
+        }
+        producer.commitTransaction();
+        producer.flush();
+        producer.close();
+
+        admin.deleteTopics(singletonList(topic)).all().get();
+        admin.close();
     }
 }
