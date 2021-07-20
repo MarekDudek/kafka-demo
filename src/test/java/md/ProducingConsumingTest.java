@@ -16,6 +16,7 @@ import java.util.concurrent.ExecutionException;
 
 import static java.time.Duration.ofSeconds;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.isNull;
 import static java.util.Optional.empty;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.*;
 import static org.apache.kafka.clients.producer.ProducerConfig.*;
@@ -142,6 +143,37 @@ final class ProducingConsumingTest
         producer.commitTransaction();
         producer.flush();
         producer.close();
+
+        admin.deleteTopics(singletonList(topic)).all().get();
+        admin.close();
+    }
+
+    @Test
+    void sending_with_callback() throws ExecutionException, InterruptedException
+    {
+        final Map<String, Object> adminConfig = ImmutableMap.<String, Object>builder().
+                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                build();
+        final AdminClient admin = AdminClient.create(adminConfig);
+
+        final String topic = "test-topic-four";
+        admin.createTopics(singletonList(new NewTopic(topic, empty(), empty()))).all().get();
+
+        final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
+                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
+                put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
+                put(ACKS_CONFIG, "all").
+                build();
+        final Producer<String, String> producer = new KafkaProducer<>(producerConfig);
+
+        final ProducerRecord<String, String> producerRecord = new ProducerRecord<>(topic, KEY, VALUE);
+        producer.send(producerRecord, (metadata, exception) -> {
+            if (isNull(exception))
+                log.info("All went well, {}", metadata);
+            else
+                log.error("Error", exception);
+        });
 
         admin.deleteTopics(singletonList(topic)).all().get();
         admin.close();
