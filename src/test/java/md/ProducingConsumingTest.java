@@ -25,7 +25,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Slf4j
 final class ProducingConsumingTest
 {
-    private static final String BOOTSTRAP_SERVERS = "localhost:19092,localhost:29092,localhost:39092";
     private static final String KEY = "key";
     private static final String VALUE = "value";
 
@@ -33,7 +32,7 @@ final class ProducingConsumingTest
     void single_record_is_produced_and_consumed() throws ExecutionException, InterruptedException
     {
         final Map<String, Object> adminConfig = ImmutableMap.<String, Object>builder().
-                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterConfigs.BOOTSTRAP_SERVERS).
                 build();
         final AdminClient admin = AdminClient.create(adminConfig);
 
@@ -41,7 +40,7 @@ final class ProducingConsumingTest
         admin.createTopics(singletonList(new NewTopic(topic, empty(), empty()))).all().get();
 
         final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
-                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterConfigs.BOOTSTRAP_SERVERS).
                 put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
                 put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
                 put(ACKS_CONFIG, "all").
@@ -58,7 +57,7 @@ final class ProducingConsumingTest
         producer.close();
 
         final Map<String, Object> consumerConfig = ImmutableMap.<String, Object>builder().
-                put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterConfigs.BOOTSTRAP_SERVERS).
                 put(KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName()).
                 put(VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName()).
                 put(GROUP_ID_CONFIG, "test-group").
@@ -82,7 +81,7 @@ final class ProducingConsumingTest
     void idempotent_producer() throws ExecutionException, InterruptedException
     {
         final Map<String, Object> adminConfig = ImmutableMap.<String, Object>builder().
-                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterConfigs.BOOTSTRAP_SERVERS).
                 build();
         final AdminClient admin = AdminClient.create(adminConfig);
 
@@ -90,7 +89,7 @@ final class ProducingConsumingTest
         admin.createTopics(singletonList(new NewTopic(topic, empty(), empty()))).all().get();
 
         final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
-                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterConfigs.BOOTSTRAP_SERVERS).
                 put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
                 put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
                 put(ACKS_CONFIG, "all").
@@ -114,7 +113,7 @@ final class ProducingConsumingTest
     void transactional_producer() throws ExecutionException, InterruptedException
     {
         final Map<String, Object> adminConfig = ImmutableMap.<String, Object>builder().
-                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterConfigs.BOOTSTRAP_SERVERS).
                 build();
         final AdminClient admin = AdminClient.create(adminConfig);
 
@@ -122,7 +121,7 @@ final class ProducingConsumingTest
         admin.createTopics(singletonList(new NewTopic(topic, empty(), empty()))).all().get();
 
         final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
-                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterConfigs.BOOTSTRAP_SERVERS).
                 put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
                 put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
                 put(ACKS_CONFIG, "all").
@@ -152,7 +151,7 @@ final class ProducingConsumingTest
     void sending_with_callback() throws ExecutionException, InterruptedException
     {
         final Map<String, Object> adminConfig = ImmutableMap.<String, Object>builder().
-                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterConfigs.BOOTSTRAP_SERVERS).
                 build();
         final AdminClient admin = AdminClient.create(adminConfig);
 
@@ -160,7 +159,7 @@ final class ProducingConsumingTest
         admin.createTopics(singletonList(new NewTopic(topic, empty(), empty()))).all().get();
 
         final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
-                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterConfigs.BOOTSTRAP_SERVERS).
                 put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
                 put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
                 put(ACKS_CONFIG, "all").

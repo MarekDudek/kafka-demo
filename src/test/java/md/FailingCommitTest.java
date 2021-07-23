@@ -24,6 +24,7 @@ import static java.time.Duration.ofSeconds;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.nonNull;
 import static java.util.Optional.empty;
+import static md.ClusterConfigs.BOOTSTRAP_SERVERS;
 import static md.Sleep.sleep;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.*;
 import static org.apache.kafka.clients.producer.ProducerConfig.*;
@@ -32,7 +33,6 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
 @Disabled
 final class FailingCommitTest
 {
-    private static final String BOOTSTRAP_SERVERS = "localhost:19092,localhost:29092,localhost:39092";
     private static final String TOPIC = "failing-commit-test";
 
     private static AdminClient createAdmin()
