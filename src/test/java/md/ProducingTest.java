@@ -27,28 +27,64 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
 @Slf4j
 final class ProducingTest
 {
-    public static final String TOPIC = "balanced-availability-durability-one-partition";
+    private static final String TOPIC = "balanced-availability-durability-one-partition";
+    private static final String SERIALIZER = StringSerializer.class.getName();
+    private static final String DESERIALIZER = StringDeserializer.class.getName();
 
     @Test
     void test() throws ExecutionException, InterruptedException
     {
+        final NewTopic newTopic = new NewTopic(TOPIC, 1, (short) 3);
+        newTopic.configs(ImmutableMap.of("min.insync.replicas", "2"));
+
+        final AdminClient admin = createAdmin();
+        admin.createTopics(singletonList(newTopic)).all().get();
+
+        final int start = 0;
+        final int end = 1_000;
+        produce(start, end);
+        consume(start, end);
+
+        admin.deleteTopics(singletonList(TOPIC)).all().get();
+        admin.close();
+    }
+
+    private static AdminClient createAdmin()
+    {
         final Map<String, Object> adminConfig = ImmutableMap.<String, Object>builder().
                 put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterConfigs.BOOTSTRAP_SERVERS).
                 build();
-        final AdminClient admin = AdminClient.create(adminConfig);
-        final NewTopic newTopic = new NewTopic(TOPIC, 1, (short) 3);
-        newTopic.configs(ImmutableMap.of("min.insync.replicas", "2"));
-        admin.createTopics(singletonList(newTopic)).all().get();
 
+        return AdminClient.create(adminConfig);
+    }
+
+    private static Producer<String, String> createProducer()
+    {
         final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
                 put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
-                put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
-                put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
+                put(KEY_SERIALIZER_CLASS_CONFIG, SERIALIZER).
+                put(VALUE_SERIALIZER_CLASS_CONFIG, SERIALIZER).
                 put(ACKS_CONFIG, "all").
                 build();
-        final Producer<String, String> producer = new KafkaProducer<>(producerConfig);
+        return new KafkaProducer<>(producerConfig);
+    }
 
-        for (int i = 0; i < 1_000; i++)
+    private static Consumer<String, String> createConsumer()
+    {
+        final Map<String, Object> consumerConfig = ImmutableMap.<String, Object>builder().
+                put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
+                put(KEY_DESERIALIZER_CLASS_CONFIG, DESERIALIZER).
+                put(VALUE_DESERIALIZER_CLASS_CONFIG, DESERIALIZER).
+                put(GROUP_ID_CONFIG, "test-group").
+                put(AUTO_OFFSET_RESET_CONFIG, "earliest").
+                build();
+        return new KafkaConsumer<>(consumerConfig);
+    }
+
+    private static void produce(final int start, final int end)
+    {
+        final Producer<String, String> producer = createProducer();
+        for (int i = start; i < end; i++)
         {
             final int index = i;
             final ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC, "key", Integer.toString(index));
@@ -60,19 +96,14 @@ final class ProducingTest
         }
         producer.flush();
         producer.close();
+    }
 
-        final Map<String, Object> consumerConfig = ImmutableMap.<String, Object>builder().
-                put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
-                put(KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName()).
-                put(VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName()).
-                put(GROUP_ID_CONFIG, "test-group").
-                put(AUTO_OFFSET_RESET_CONFIG, "earliest").
-                build();
-        final Consumer<String, String> consumer = new KafkaConsumer<>(consumerConfig);
+    private static void consume(final int start, final int end)
+    {
+        final Consumer<String, String> consumer = createConsumer();
         consumer.subscribe(singletonList(TOPIC));
-
-        int next = 0;
-        while (next < 1000)
+        int next = start;
+        while (next < end)
         {
             final ConsumerRecords<String, String> records = consumer.poll(ofSeconds(1));
             for (final ConsumerRecord<String, String> record : records)
@@ -86,8 +117,5 @@ final class ProducingTest
             }
         }
         consumer.close();
-
-        admin.deleteTopics(singletonList(TOPIC)).all().get();
-        admin.close();
     }
 }
