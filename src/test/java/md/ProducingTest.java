@@ -116,7 +116,7 @@ final class ProducingTest
         final NewTopic newTopic = params.newTopic();
         admin.createTopics(singletonList(newTopic)).all().get();
 
-        final int produceCount = 100_000;
+        final int produceCount = 1_000_000;
         produce(produceCount, newTopic, params.acks);
         final BitSet consumed = consume(produceCount, newTopic);
 
