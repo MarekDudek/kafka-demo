@@ -18,11 +18,13 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.BitSet;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.ImmutableMap.of;
+import static java.lang.Integer.parseInt;
 import static java.lang.String.format;
 import static java.time.Duration.ofSeconds;
 import static java.util.Collections.singletonList;
@@ -30,6 +32,9 @@ import static java.util.Objects.nonNull;
 import static md.ClusterConfigs.BOOTSTRAP_SERVERS;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.*;
 import static org.apache.kafka.clients.producer.ProducerConfig.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.fail;
+
 
 @Slf4j
 final class ProducingTest
@@ -111,13 +116,17 @@ final class ProducingTest
         final NewTopic newTopic = params.newTopic();
         admin.createTopics(singletonList(newTopic)).all().get();
 
-        final int start = 0;
-        final int end = 1_000_000;
-        produce(start, end, newTopic, params.acks);
-        consume(start, end, newTopic);
+        final int produceCount = 100_000;
+        produce(produceCount, newTopic, params.acks);
+        final BitSet consumed = consume(produceCount, newTopic);
 
         admin.deleteTopics(singletonList(newTopic.name())).all().get();
         admin.close();
+
+        final int consumedCount = consumed.cardinality();
+        assertThat(consumedCount).
+                as("Missing %d on topic %s", produceCount - consumedCount, newTopic.name()).
+                isEqualTo(produceCount);
     }
 
     private static AdminClient createAdmin()
@@ -152,16 +161,18 @@ final class ProducingTest
         return new KafkaConsumer<>(consumerConfig);
     }
 
-    private static void produce(final int start, final int end, final NewTopic newTopic, @NonNull String acks)
+    private static void produce(final int count, final NewTopic newTopic, final String acks)
     {
         final Producer<String, String> producer = createProducer(acks);
-        for (int i = start; i < end; i++)
+        for (int i = 0; i < count; i++)
         {
-            final int index = i;
-            final ProducerRecord<String, String> record = new ProducerRecord<>(newTopic.name(), "key", Integer.toString(index));
+            final ProducerRecord<String, String> record = new ProducerRecord<>(newTopic.name(), Integer.toString(i));
             producer.send(record, (metadata, exception) -> {
                         if (nonNull(exception))
-                            log.warn("Error while sending record {}", index);
+                        {
+                            producer.close();
+                            fail("Error while sending record", exception);
+                        }
                     }
             );
         }
@@ -169,25 +180,23 @@ final class ProducingTest
         producer.close();
     }
 
-    private static void consume(final int start, final int end, final NewTopic newTopic)
+    private static BitSet consume(final int count, final NewTopic newTopic)
     {
         final Consumer<String, String> consumer = createConsumer();
         consumer.subscribe(singletonList(newTopic.name()));
-        int expected = start;
-        while (expected < end)
+        final BitSet consumed = new BitSet(count);
+        final ConsumerRecords<String, String> first = consumer.poll(ofSeconds(5));
+        for (final ConsumerRecord<String, String> record : first)
+            consumed.set(parseInt(record.value()));
+        while (true)
         {
             final ConsumerRecords<String, String> records = consumer.poll(ofSeconds(1));
+            if (records.isEmpty())
+                break;
             for (final ConsumerRecord<String, String> record : records)
-            {
-                final int actual = Integer.parseInt(record.value());
-                if (expected != actual)
-                {
-                    log.warn("Miss: exp {}, act {} [{}]", expected, actual, newTopic.name());
-                    expected = actual;
-                }
-                expected++;
-            }
+                consumed.set(parseInt(record.value()));
         }
         consumer.close();
+        return consumed;
     }
 }
