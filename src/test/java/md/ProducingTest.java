@@ -34,10 +34,6 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
 @Slf4j
 final class ProducingTest
 {
-    private static final String SERIALIZER = StringSerializer.class.getName();
-    private static final String DESERIALIZER = StringDeserializer.class.getName();
-    private static final int NUM_PARTITIONS = 1;
-
     @Value
     @Builder
     private static class Availability
@@ -53,7 +49,7 @@ final class ProducingTest
     private static class Params
     {
         @NonNull
-        public ProducingTest.Availability availability;
+        public Availability availability;
         public int numPartitions;
         @NonNull
         public String acks;
@@ -94,13 +90,9 @@ final class ProducingTest
                 settingsName("moderate").
                 build();
 
-        final String zero = "0";
-        final String one = "1";
-        final String all = "all";
-
         return Stream.of(balanced, low, max, moderate).flatMap(availability ->
                 Stream.of(1, 2, 3).flatMap(numPartitions ->
-                        Stream.of(zero, one, all).map(acks ->
+                        Stream.of("0", "1", "all").map(acks ->
                                 Params.builder().
                                         availability(availability).
                                         numPartitions(numPartitions).
@@ -141,8 +133,8 @@ final class ProducingTest
     {
         final Map<String, Object> producerConfig = ImmutableMap.<String, Object>builder().
                 put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
-                put(KEY_SERIALIZER_CLASS_CONFIG, SERIALIZER).
-                put(VALUE_SERIALIZER_CLASS_CONFIG, SERIALIZER).
+                put(KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
+                put(VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName()).
                 put(ACKS_CONFIG, acks).
                 build();
         return new KafkaProducer<>(producerConfig);
@@ -152,8 +144,8 @@ final class ProducingTest
     {
         final Map<String, Object> consumerConfig = ImmutableMap.<String, Object>builder().
                 put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS).
-                put(KEY_DESERIALIZER_CLASS_CONFIG, DESERIALIZER).
-                put(VALUE_DESERIALIZER_CLASS_CONFIG, DESERIALIZER).
+                put(KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName()).
+                put(VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName()).
                 put(GROUP_ID_CONFIG, "test-group").
                 put(AUTO_OFFSET_RESET_CONFIG, "earliest").
                 build();
