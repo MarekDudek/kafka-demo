@@ -169,7 +169,7 @@ final class ProducingTest
             final ProducerRecord<String, String> record = new ProducerRecord<>(newTopic.name(), "key", Integer.toString(index));
             producer.send(record, (metadata, exception) -> {
                         if (nonNull(exception))
-                            log.error("Error while sending record #{}", index);
+                            log.warn("Error while sending record {}", index);
                     }
             );
         }
@@ -190,7 +190,7 @@ final class ProducingTest
                 final int actual = Integer.parseInt(record.value());
                 if (expected != actual)
                 {
-                    log.error("Miss: exp {}, act {} [{}]", expected, actual, newTopic.name());
+                    log.warn("Miss: exp {}, act {} [{}]", expected, actual, newTopic.name());
                     expected = actual;
                 }
                 expected++;
