@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.ImmutableMap.of;
+import static java.lang.String.format;
 import static java.time.Duration.ofSeconds;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.nonNull;
@@ -39,13 +40,12 @@ final class ProducingTest
 
     @Value
     @Builder
-    private static class TopicParams
+    private static class Availability
     {
-        public int numPartitions;
         public int replicationFactor;
         public int minInsyncReplicas;
         @NonNull
-        public String name;
+        public String settingsName;
     }
 
     @Value
@@ -53,18 +53,19 @@ final class ProducingTest
     private static class Params
     {
         @NonNull
-        public TopicParams topicParams;
+        public ProducingTest.Availability availability;
+        public int numPartitions;
         @NonNull
         public String acks;
 
         public NewTopic newTopic()
         {
             return new NewTopic(
-                    topicParams.name + "-" + acks,
-                    topicParams.numPartitions,
-                    (short) topicParams.replicationFactor).
+                    format("%s_acks-%s_pts-%d", availability.settingsName, acks, numPartitions),
+                    numPartitions,
+                    (short) availability.replicationFactor).
                     configs(of(
-                            "min.insync.replicas", Integer.toString(topicParams.minInsyncReplicas)
+                            "min.insync.replicas", Integer.toString(availability.minInsyncReplicas)
                             )
                     );
         }
@@ -72,40 +73,37 @@ final class ProducingTest
 
     private static Stream<Params> params()
     {
-        final TopicParams balanced = TopicParams.builder().
-                numPartitions(1).
+        final Availability balanced = Availability.builder().
                 replicationFactor(3).
                 minInsyncReplicas(2).
-                name("balanced").
+                settingsName("balanced").
                 build();
-        final TopicParams low = TopicParams.builder().
-                numPartitions(1).
+        final Availability low = Availability.builder().
                 replicationFactor(1).
                 minInsyncReplicas(1).
-                name("low").
+                settingsName("low").
                 build();
-        final TopicParams max = TopicParams.builder().
-                numPartitions(1).
+        final Availability max = Availability.builder().
                 replicationFactor(3).
                 minInsyncReplicas(1).
-                name("max").
+                settingsName("max").
                 build();
-        final TopicParams moderate = TopicParams.builder().
-                numPartitions(1).
+        final Availability moderate = Availability.builder().
                 replicationFactor(2).
                 minInsyncReplicas(1).
-                name("moderate").
+                settingsName("moderate").
                 build();
 
         final String zero = "0";
         final String one = "1";
         final String all = "all";
 
-        return Stream.of(balanced, low, max, moderate).flatMap(topicParams ->
-                Stream.of(zero, one, all).flatMap(acks ->
-                        Stream.of(
+        return Stream.of(balanced, low, max, moderate).flatMap(availability ->
+                Stream.of(1, 2, 3).flatMap(numPartitions ->
+                        Stream.of(zero, one, all).map(acks ->
                                 Params.builder().
-                                        topicParams(topicParams).
+                                        availability(availability).
+                                        numPartitions(numPartitions).
                                         acks(acks).
                                         build()
                         )
@@ -122,7 +120,7 @@ final class ProducingTest
         admin.createTopics(singletonList(newTopic)).all().get();
 
         final int start = 0;
-        final int end = 1_0_000;
+        final int end = 1_000_000;
         produce(start, end, newTopic, params.acks);
         consume(start, end, newTopic);
 
@@ -183,16 +181,19 @@ final class ProducingTest
     {
         final Consumer<String, String> consumer = createConsumer();
         consumer.subscribe(singletonList(newTopic.name()));
-        int next = start;
-        while (next < end)
+        int expected = start;
+        while (expected < end)
         {
             final ConsumerRecords<String, String> records = consumer.poll(ofSeconds(1));
             for (final ConsumerRecord<String, String> record : records)
             {
-                final int current = Integer.parseInt(record.value());
-                if (current != next)
-                    log.error("Missing at, current = {}, next = {}", current, next);
-                next++;
+                final int actual = Integer.parseInt(record.value());
+                if (expected != actual)
+                {
+                    log.error("Miss: exp {}, act {} [{}]", expected, actual, newTopic.name());
+                    expected = actual;
+                }
+                expected++;
             }
         }
         consumer.close();
