@@ -2,7 +2,7 @@
 # Docker
 # Docker Compose
 * build, (re)create, start and attach to containers for a service
-  
+
 `docker-compose --file docker-compose.yml up -d`
 * stop and remove containers
 
@@ -16,11 +16,6 @@
 * execute bash on broker service
 
 `docker-compose exec broker bash`
-* create topic 
+* create topic
 
-`kafka-topics 
-    --create 
-    --topic name 
-    --bootstrap-server broker:9092 
-    --replication-factor 1 
-    --partitions 1`
+`kafka-topics --create --topic name --bootstrap-server broker:9092 --replication-factor 1 --partitions 1`

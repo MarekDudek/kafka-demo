@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 
 @Slf4j
-final class ProducingTest
+final class ProducingConsumingMultipleMessagesTest
 {
     @Value
     @Builder
@@ -74,28 +74,29 @@ final class ProducingTest
 
     private static Stream<Params> params()
     {
-        final Availability balanced = Availability.builder().
-                replicationFactor(3).
-                minInsyncReplicas(2).
-                settingsName("balanced").
-                build();
-        final Availability low = Availability.builder().
-                replicationFactor(1).
-                minInsyncReplicas(1).
-                settingsName("low").
-                build();
-        final Availability max = Availability.builder().
-                replicationFactor(3).
-                minInsyncReplicas(1).
-                settingsName("max").
-                build();
-        final Availability moderate = Availability.builder().
-                replicationFactor(2).
-                minInsyncReplicas(1).
-                settingsName("moderate").
-                build();
 
-        return Stream.of(balanced, low, max, moderate).flatMap(availability ->
+        return Stream.of(
+                Availability.builder().
+                        replicationFactor(3).
+                        minInsyncReplicas(2).
+                        settingsName("balanced").
+                        build(),
+                Availability.builder().
+                        replicationFactor(1).
+                        minInsyncReplicas(1).
+                        settingsName("low").
+                        build(),
+                Availability.builder().
+                        replicationFactor(3).
+                        minInsyncReplicas(1).
+                        settingsName("max").
+                        build(),
+                Availability.builder().
+                        replicationFactor(2).
+                        minInsyncReplicas(1).
+                        settingsName("moderate").
+                        build()
+        ).flatMap(availability ->
                 Stream.of(1, 2, 3).flatMap(numPartitions ->
                         Stream.of("0", "1", "all").map(acks ->
                                 Params.builder().
