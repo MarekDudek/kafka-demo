@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 import static com.google.common.collect.ImmutableMap.of;
 import static java.lang.Integer.parseInt;
 import static java.lang.String.format;
+import static java.time.Duration.ofMillis;
 import static java.time.Duration.ofSeconds;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.nonNull;
@@ -74,7 +75,6 @@ final class ProducingConsumingMultipleMessagesTest
 
     private static Stream<Params> params()
     {
-
         return Stream.of(
                 Availability.builder().
                         replicationFactor(3).
@@ -117,7 +117,7 @@ final class ProducingConsumingMultipleMessagesTest
         final NewTopic newTopic = params.newTopic();
         admin.createTopics(singletonList(newTopic)).all().get();
 
-        final int produceCount = 1_000_000;
+        final int produceCount = 100_000;
         produce(produceCount, newTopic, params.acks);
         final BitSet consumed = consume(produceCount, newTopic);
 
@@ -167,7 +167,8 @@ final class ProducingConsumingMultipleMessagesTest
         final Producer<String, String> producer = createProducer(acks);
         for (int i = 0; i < count; i++)
         {
-            final ProducerRecord<String, String> record = new ProducerRecord<>(newTopic.name(), Integer.toString(i));
+            final String string = Integer.toString(i);
+            final ProducerRecord<String, String> record = new ProducerRecord<>(newTopic.name(), string, string);
             producer.send(record, (metadata, exception) -> {
                         if (nonNull(exception))
                         {
@@ -191,7 +192,7 @@ final class ProducingConsumingMultipleMessagesTest
             consumed.set(parseInt(record.value()));
         while (true)
         {
-            final ConsumerRecords<String, String> records = consumer.poll(ofSeconds(1));
+            final ConsumerRecords<String, String> records = consumer.poll(ofMillis(2000));
             if (records.isEmpty())
                 break;
             for (final ConsumerRecord<String, String> record : records)
